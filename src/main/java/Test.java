@@ -9,47 +9,37 @@ import java.util.Map;
 
 public class Test {
     public static void main(String[] args) throws Exception {
-        File taskFile = new File("/Users/vzikratyi/Test/6.txt");
+        File taskFile = new File("/Users/vzikratyi/Test/7.txt");
         try (Reader r = new FileReader(taskFile);
              BufferedReader br = new BufferedReader(r)) {
 
 //            String[] lines = br.lines().toArray(String[]::new);
 
-            int[] fishes = Arrays.stream(br.readLine().split(",")).mapToInt(Integer::parseInt).toArray();
+            int[] crabsPositions = Arrays.stream(br.readLine().split(",")).mapToInt(Integer::parseInt).toArray();
 
-            long startTs = System.nanoTime();
-            long totalFish = fishSpawned(fishes, 256);
-            long endTs = System.nanoTime();
+            Arrays.sort(crabsPositions);
 
-            System.out.println(totalFish + ", time took - " + Duration.ofNanos(endTs - startTs).toMillis());
-        }
-    }
-
-    private static final int TIME_TO_SPAWN = 7;
-    private static final int INITIAL_TIME_TO_SPAWN = 9;
-
-    private static long fishSpawned(int[] initialFishes, int days) {
-        Map<Integer, Long> calculatedFishSpawned = createCalculatedFishSpawnedDictionary(days);
-
-        long totalFish = 0;
-        for (int daysToSpawn : initialFishes) {
-            int daysAfterBirth = (days - daysToSpawn) + INITIAL_TIME_TO_SPAWN;
-            totalFish += calculatedFishSpawned.get(daysAfterBirth) + 1;
-        }
-
-        return totalFish;
-    }
-
-    private static Map<Integer, Long> createCalculatedFishSpawnedDictionary(int days) {
-        Map<Integer, Long> calculatedFishSpawned = new HashMap<>();
-        for (int i = 0; i < days + INITIAL_TIME_TO_SPAWN; i++) {
-            long fishSpawned = 0;
-            for (int j = i - INITIAL_TIME_TO_SPAWN; j > 0; j -= TIME_TO_SPAWN) {
-                fishSpawned += calculatedFishSpawned.get(j) + 1;
+            int totalPositions = 0;
+            for (int crabPosition : crabsPositions) {
+                totalPositions += crabPosition;
             }
-            calculatedFishSpawned.put(i, fishSpawned);
+            int averagePosition = (int) Math.round((double) totalPositions / crabsPositions.length);
+
+            int fuel = 0;
+            for (int crabPosition : crabsPositions) {
+                fuel += calculateFuelCost(Math.abs(crabPosition - averagePosition));
+            }
+            System.out.println("Position - " + averagePosition + ", fuel - " + fuel +
+                    ", avg double - " + (double) totalPositions / crabsPositions.length);
         }
-        return calculatedFishSpawned;
+    }
+
+    private static int calculateFuelCost(int distance) {
+        int fuel = 0;
+        for (int i = 1; i <= distance; i++) {
+            fuel += i;
+        }
+        return fuel;
     }
 
 }
