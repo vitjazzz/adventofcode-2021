@@ -6,7 +6,7 @@ import java.util.Arrays;
 import java.util.Stack;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class Test {
+public class LuminescentOctopus {
     public static void main(String[] args) throws Exception {
         File taskFile = new File("/Users/vzikratyi/Test/11.txt");
         try (Reader r = new FileReader(taskFile);
