@@ -2,105 +2,112 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.Reader;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.Arrays;
 import java.util.Stack;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Test {
     public static void main(String[] args) throws Exception {
-        File taskFile = new File("/Users/vzikratyi/Test/10.txt");
+        File taskFile = new File("/Users/vzikratyi/Test/11.txt");
         try (Reader r = new FileReader(taskFile);
              BufferedReader br = new BufferedReader(r)) {
 
-            List<String> lines = br.lines().collect(Collectors.toList());
+            String[] lines = br.lines().toArray(String[]::new);
 
-            BracesManager bracesManager = new BracesManager(lines);
+            int[][] board = new int[lines.length][lines.length];
+            for (int i = 0; i < lines.length; i++) {
+                int[] row = Arrays.stream(lines[i].split("")).mapToInt(Integer::parseInt).toArray();
+                board[i] = row;
+            }
 
-            System.out.println(bracesManager.getCompletionScore());
+            OctopusBoard octopusBoard = new OctopusBoard(board);
+
+            System.out.println(octopusBoard.findFirstTotalFlash());
         }
     }
 
-    private static class BracesManager {
-        private static final Map<String, Integer> ERROR_SCORES = Map.of(
-                ")", 3,
-                "]", 57,
-                "}", 1197,
-                ">", 25137
-        );
-        private static final Map<String, Integer> COMPLETION_SCORES = Map.of(
-                ")", 1,
-                "]", 2,
-                "}", 3,
-                ">", 4
-        );
+    private static class OctopusBoard {
+        private final Octopus[][] board;
 
-        private static final Set<String> OPENING_BRACES = Set.of(
-                "(", "[", "{", "<"
-        );
-
-        private static final Map<String, String> MATCHING_BRACES = Map.of(
-                "(", ")",
-                "[", "]",
-                "{", "}",
-                "<", ">"
-        );
-
-
-        private final List<String> foundErrorBraces = new ArrayList<>();
-        private final List<List<String>> completedLines = new ArrayList<>();
-
-        public BracesManager(Collection<String> lines) {
-            lines.stream()
-                    .filter(Predicate.not(String::isBlank))
-                    .forEach(this::validateBraces);
+        private OctopusBoard(int[][] inputBoard) {
+            this.board = new Octopus[inputBoard.length][inputBoard[0].length];
+            for (int i = 0; i < board.length; i++) {
+                for (int j = 0; j < board[0].length; j++) {
+                    this.board[i][j] = new Octopus(inputBoard[i][j], i, j);
+                }
+            }
         }
 
-        private void validateBraces(String line) {
-            Stack<String> openingBraces = new Stack<>();
-            for (String brace : line.split("")) {
-                if (OPENING_BRACES.contains(brace)) {
-                    openingBraces.push(brace);
-                } else {
-                    if (openingBraces.isEmpty() || !MATCHING_BRACES.get(openingBraces.pop()).equals(brace)) {
-                        foundErrorBraces.add(brace);
-                        return;
+        public int calculateTotalFlashes(int steps) {
+            int totalFlashes = 0;
+            for (int i = 0; i < steps; i++) {
+                totalFlashes += simulateStep();
+            }
+            return totalFlashes;
+        }
+
+        public int findFirstTotalFlash() {
+            for (int i = 1;; i++) {
+                int flashCount = simulateStep();
+                if (flashCount == board.length * board[0].length) {
+                    return i;
+                }
+            }
+        }
+
+        private int simulateStep() {
+            Stack<Octopus> flashedOctopus = new Stack<>();
+            for (int i = 0; i < board.length; i++) {
+                for (int j = 0; j < board[0].length; j++) {
+                    board[i][j].flashedThisTurn = false;
+                    int newEnergyLevel = board[i][j].energyLevel.incrementAndGet();
+                    if (newEnergyLevel == 10) {
+                        flashedOctopus.push(board[i][j]);
                     }
                 }
             }
-            if (!openingBraces.isEmpty()) {
-                List<String> completedClosingBraces = openingBraces.stream()
-                        .map(MATCHING_BRACES::get)
-                        .collect(Collectors.toList());
-                Collections.reverse(completedClosingBraces);
-                completedLines.add(completedClosingBraces);
-            }
-        }
 
-        public int getErrorScore() {
-            return foundErrorBraces.stream().mapToInt(ERROR_SCORES::get).sum();
-        }
-
-        public long getCompletionScore() {
-            long[] scores = completedLines.stream()
-                    .mapToLong(braces -> {
-                        long score = 0;
-                        for (String brace : braces) {
-                            score = score * 5 + COMPLETION_SCORES.get(brace);
+            int totalFlashes = 0;
+            while (!flashedOctopus.isEmpty()) {
+                Octopus octopus = flashedOctopus.pop();
+                totalFlashes++;
+                octopus.energyLevel.set(0);
+                octopus.flashedThisTurn = true;
+                for (int i = octopus.i - 1; i <= octopus.i + 1; i++) {
+                    for (int j = octopus.j - 1; j <= octopus.j + 1; j++) {
+                        if (!isValidPoint(i, j)) {
+                            continue;
                         }
-                        return score;
-                    })
-                    .sorted()
-                    .toArray();
-            return scores[scores.length / 2];
+                        Octopus surroundingOctopus = board[i][j];
+                        if (surroundingOctopus.flashedThisTurn) {
+                            continue;
+                        }
+                        int newEnergyLevel = surroundingOctopus.energyLevel.incrementAndGet();
+                        if (newEnergyLevel == 10) {
+                            flashedOctopus.push(surroundingOctopus);
+                        }
+                    }
+                }
+            }
+
+            return totalFlashes;
         }
 
+        private boolean isValidPoint(int i, int j) {
+            return i >= 0 && i < board.length && j >= 0 && j < board[0].length;
+        }
+    }
+
+    private static class Octopus {
+        private boolean flashedThisTurn = false;
+        private AtomicInteger energyLevel;
+        private int i;
+        private int j;
+
+        public Octopus(int energyLevel, int i, int j) {
+            this.energyLevel = new AtomicInteger(energyLevel);
+            this.i = i;
+            this.j = j;
+        }
     }
 }
