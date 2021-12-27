@@ -1,4 +1,4 @@
-import com.google.common.collect.Sets;
+import lombok.Value;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -7,137 +7,133 @@ import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public class Test {
     public static void main(String[] args) throws Exception {
-        File taskFile = new File("/Users/vzikratyi/Test/8.txt");
+        File taskFile = new File("/Users/vzikratyi/Test/9.txt");
         try (Reader r = new FileReader(taskFile);
              BufferedReader br = new BufferedReader(r)) {
 
-            Long result = br.lines()
-                    .map(str -> str.split(" \\| "))
-                    .mapToLong(strs -> {
-                        List<Set<String>> encodedNumbers = Arrays.stream(strs[0].split(" "))
-                                .map(str -> Arrays.stream(str.split("")).collect(Collectors.toSet()))
-                                .collect(Collectors.toList());
-                        Display display = new Display(encodedNumbers);
+            List<int[]> boardLines = br.lines()
+                    .map(str -> str.split(""))
+                    .map(numberStrs -> Arrays.stream(numberStrs).mapToInt(Integer::parseInt).toArray())
+                    .collect(Collectors.toList());
 
+            int[][] board = null;
+            for (int i = 0; i < boardLines.size(); i++) {
+                int[] boardLine = boardLines.get(i);
+                if (board == null) {
+                    board = new int[boardLines.size()][boardLine.length];
+                }
+                board[i] = boardLine;
+            }
 
-                        List<Integer> numbers = Arrays.stream(strs[1].split(" "))
-                                .map(str -> Arrays.stream(str.split("")).collect(Collectors.toSet()))
-                                .map(display::getNumber)
-                                .collect(Collectors.toList());
-                        long value = 0;
-                        long multiplier = 1;
-                        for (int i = numbers.size() - 1; i >= 0; i--) {
-                            value += numbers.get(i) * multiplier;
-                            multiplier *= 10;
-                        }
-                        return value;
-                    })
-                    .sum();
+            BoardRiskCalculator riskCalculator = new BoardRiskCalculator(board);
 
-            System.out.println(result);
+            System.out.println(riskCalculator.getTotalRisk());
         }
     }
 
-    private static class Display {
-        Map<Set<String>, Integer> numberRules = new HashMap<>();
+    private static class BoardRiskCalculator {
+        List<Point> lowestPoints = new ArrayList<>();
+        private final int[][] board;
 
-        public Display(Collection<Set<String>> encodedNumbers) {
-            Set<Set<String>> unsolvedEncodedNumbers = new HashSet<>(encodedNumbers);
-
-            Set<String> one = unsolvedEncodedNumbers.stream().filter(set -> set.size() == 2).findAny().get();
-            unsolvedEncodedNumbers.remove(one);
-            numberRules.put(one, 1);
-
-            Set<String> four = unsolvedEncodedNumbers.stream().filter(set -> set.size() == 4).findAny().get();
-            unsolvedEncodedNumbers.remove(four);
-            numberRules.put(four, 4);
-
-            Set<String> seven = unsolvedEncodedNumbers.stream().filter(set -> set.size() == 3).findAny().get();
-            unsolvedEncodedNumbers.remove(seven);
-            numberRules.put(seven, 7);
-
-            Set<String> eight = unsolvedEncodedNumbers.stream().filter(set -> set.size() == 7).findAny().get();
-            unsolvedEncodedNumbers.remove(eight);
-            numberRules.put(eight, 8);
-
-            Set<String> six = unsolvedEncodedNumbers.stream()
-                    .filter(set -> set.size() == 6)
-                    .filter(set ->
-                        !Sets.intersection(one, Sets.difference(eight, set)).isEmpty()
-                    )
-                    .findAny().get();
-            unsolvedEncodedNumbers.remove(six);
-            numberRules.put(six, 6);
-
-            Set<String> zero = unsolvedEncodedNumbers.stream()
-                    .filter(set -> set.size() == 6)
-                    .filter(set ->
-                        !Sets.intersection(four, Sets.difference(eight, set)).isEmpty()
-                    )
-                    .findAny().get();
-            unsolvedEncodedNumbers.remove(zero);
-            numberRules.put(zero, 0);
-
-            Set<String> nine = unsolvedEncodedNumbers.stream()
-                    .filter(set -> set.size() == 6)
-                    .findAny().get();
-            unsolvedEncodedNumbers.remove(nine);
-            numberRules.put(nine, 9);
-
-            String topRight = Sets.difference(eight, six).stream().findAny().get();
-            Set<String> five = unsolvedEncodedNumbers.stream()
-                    .filter(set -> set.size() == 5)
-                    .filter(set -> Sets.difference(nine, set).equals(Set.of(topRight)))
-                    .findAny().get();
-            unsolvedEncodedNumbers.remove(five);
-            numberRules.put(five, 5);
-
-            String bottomRight = Sets.difference(one, Set.of(topRight)).stream().findAny().get();
-            Set<String> three = unsolvedEncodedNumbers.stream()
-                    .filter(set -> set.size() == 5)
-                    .filter(set -> Sets.intersection(Set.of(bottomRight, topRight), set).size() == 2)
-                    .findAny().get();
-            unsolvedEncodedNumbers.remove(three);
-            numberRules.put(three, 3);
-
-            Set<String> two = unsolvedEncodedNumbers.stream()
-                    .findAny().get();
-            unsolvedEncodedNumbers.remove(two);
-            numberRules.put(two, 2);
+        public BoardRiskCalculator(int[][] board) {
+            this.board = board;
+            for (int i = 0; i < board.length; i++) {
+                for (int j = 0; j < board[0].length; j++) {
+                    if (isLowPoint(i, j, board)) {
+                        lowestPoints.add(new Point(i, j));
+                    }
+                }
+            }
         }
 
-        public Integer getNumber(Set<String> encoded) {
-            return numberRules.get(encoded);
+        private boolean isLowPoint(int i, int j, int[][] board) {
+            int pointHeight = board[i][j];
+            return pointHeight < getPointHeight(i - 1, j, board)
+                    && pointHeight < getPointHeight(i + 1, j, board)
+                    && pointHeight < getPointHeight(i, j - 1, board)
+                    && pointHeight < getPointHeight(i, j + 1, board);
+        }
+
+        private int getPointHeight(int i, int j, int[][] board) {
+            return isPointValid(i, j, board) ? board[i][j] : Integer.MAX_VALUE;
+        }
+
+        private boolean isPointValid(int i, int j, int[][] board) {
+            return i >= 0 && i < board.length && j >= 0 && j < board[0].length;
+        }
+
+        public Integer getTotalRisk() {
+            return lowestPoints.stream().mapToInt(point -> board[point.i][point.j]).sum();
+        }
+    }
+
+    private static class HigherPoints {
+        private final int value;
+        private final Set<Point> points = new HashSet<>();
+        private boolean isPointLowest = false;
+
+        public HigherPoints(int value) {
+            this.value = value;
+        }
+
+        public void addPoint(int i, int j) {
+            points.add(new Point(i, j));
+        }
+
+        public void setPointLowest() {
+            isPointLowest = true;
+        }
+
+        public boolean isPointLowest() {
+            return isPointLowest;
+        }
+
+        public Set<Point> getPoints() {
+            return points;
         }
 
     }
-    /*
-        th = 7 - 1;
-        bh = 9 - (7 + 4);
-        mh = 3 - (7 + bh);
-        tl = (4 - 1) - mh;
-        bl = 0 - bh - tl - 7;
-        br = 5 - tl - th - mh - bh;
-        tr = 1 - br;
 
-        1 = 2 sides;
-        7 = 3 sides;
-        4 = 4 sides;
-        2 = 5 sides;
-        3 = 5 sides;
-        5 = 5 sides;
-        6 = 6 sides;
-        9 = 6 sides;
-        0 = 6 sides;
-        8 = 7 sides;
-     */
+    private static class BasinManager {
+        private final Set<Basin> basins = new HashSet<>();
+        private final Basin[][] pointsToBasin;
+
+        public BasinManager(int[][] board) {
+            pointsToBasin = new Basin[board.length][board[0].length];
+        }
+
+        public void connectPoints(Point first) {
+
+        }
+
+        public int getTopLargestBasins(int amount) {
+            return basins.stream()
+                    .map(Basin::getPoints)
+                    .map(Collection::size)
+                    .sorted(Collections.reverseOrder())
+                    .limit(amount)
+                    .mapToInt(i -> i)
+                    .sum()
+                    ;
+        }
+    }
+
+    @Value
+    private static class Basin {
+        Set<Point> points;
+    }
+
+    @Value
+    private static class Point {
+        int i;
+        int j;
+    }
 }
