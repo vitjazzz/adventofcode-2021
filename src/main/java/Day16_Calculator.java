@@ -218,10 +218,6 @@ public class Day16_Calculator {
         }
     }
 
-        private enum PacketType {
-        OPERATOR, LITERAL;
-    }
-
     @AllArgsConstructor
     private static class OperatorLengthLeftCalculator {
         private final OperatorLengthLeftType type;
